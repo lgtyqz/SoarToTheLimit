@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Soar to the limit</title>
+        <style>
+            canvas {
+                border: 1px solid black;
+            }
+        </style>
+        <script>
+//header
+
+var GAME = {
+    canvas: document.createElement("canvas"),
+    start: function(){
+        this.canvas.width = 1000;
+        this.canvas.height = 800;
+        this.context = this.canvas.getContext("2d");
+        document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+        this.frameCount = 0;
+        this.interval = setInterval(main, 20);
+    },
+    clear: function(){
+        this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    },
+    gravity: 1,
+    friction: 0.98,
+    level: 1,
+    camera: {x:0, y:0},
+    editingMode: true,
+    debugMode: false
+}
+
+function colorToList(color){
+    return [
+        parseInt(color.slice(1, 3), 16),
+        parseInt(color.slice(3, 5), 16),
+        parseInt(color.slice(5, 7), 16)];
+}
+function listToColor(color){
+    return "#" + ("0"+(Number(color[0]).toString(16))).slice(-2).toUpperCase() +
+                ("0"+(Number(color[1]).toString(16))).slice(-2).toUpperCase() +
+                ("0"+(Number(color[2]).toString(16))).slice(-2).toUpperCase();
+}
+
+function Entity(X, Y, W, H){
+    this.pPosition = {x: X, y: Y};
+    this.position = {x: X, y: Y};
+    this.velocity = {x: 0, y: 0};
+    this.width = W;
+    this.height = H;
+}
+Entity.prototype.move = function(){
+    this.position.x += this.velocity.x;
+    this.position.y += this.velocity.y;
+    this.velocity.x *= GAME.friction;
+    this.velocity.y *= GAME.friction;
+}
+Entity.prototype.applyGravity = function(){
+    this.velocity.y += GAME.gravity;
+}
+Entity.prototype.draw = function(){
+    var CTX = GAME.context;
+    CTX.fillStyle = "#FF0000";
+    CTX.fillRect(this.position.x, this.position.y, this.width, this.height);
+}
+Entity.prototype.applyForce = function(x, y){
+    this.velocity.x += x;
+    this.velocity.y += y;
+}
+Entity.prototype.collides = function(obj){
+    if(obj instanceof Entity){
+        return (this.position.x + this.width > obj.position.x &&
+            this.position.x < obj.position.x + obj.width &&
+            this.position.y + this.height > obj.position.y &&
+            this.position.y < obj.position.y + obj.height);
+    }
+    return false;
+}
+Entity.prototype.interact = function(obj){ /*method stub*/ }
+function WindArea(X, Y, W, H, forceX, forceY){
+    Entity.call(this, X, Y, W, H);
+    this.force = {x: forceX, y: forceY};
+}
+WindArea.prototype = Object.create(Entity.prototype);
+WindArea.prototype.interact = function(obj){
+    if(obj instanceof Entity && this.collides(obj)){
+        obj.applyForce(this.force.x, this.force.y);
+    }
+}
+WindArea.prototype.draw = function(){
+    var CTX = GAME.context;
+    CTX.globalAlpha = 0.5;
+    //TODO: Replace with image
+    CTX.fillStyle = "#DEDEDE";
+    CTX.fillRect(this.position.x, this.position.y, this.width, this.height);
+    CTX.globalAlpha = 1;
+}
+function Water(X, Y, W, H, forceX, forceY){
+    Entity.call(this, X, Y, W, H);
+    this.force = {x: forceX, y: forceY};
+}
+Water.prototype = Object.create(Entity.prototype);
+Water.prototype.interact = function(obj){
+    if(obj instanceof Entity && this.collides(obj)){
+        obj.applyForce(this.force.x, this.force.y);
+        obj.velocity.x *= 0.9;
+        obj.velocity.y *= 0.9;
+        if(obj instanceof Player){
+            obj.gliding = false;
+            obj.soaring = false;
+            powerOfV = Math.sqrt(obj.velocity.x ** 2 + obj.velocity.y ** 2);
+            if(powerOfV > 5){
+                obj.delayTimer = 10;
+            }
+        }
+    }
+}
+Water.prototype.draw = function(){
+    var CTX = GAME.context;
+    CTX.globalAlpha = 0.5;
+    //TODO: Replace with image
+    CTX.fillStyle = "#00AAFF";
+    CTX.fillRect(this.position.x, this.position.y, this.width, this.height);
+    CTX.globalAlpha = 1;
+}
+function Block(X, Y, W, H){
+    Entity.call(this, X, Y, W, H);
+}
+Block.prototype = Object.create(Entity.prototype);
+Block.prototype.interact = function(obj){
+    if(obj instanceof Entity && this.collides(obj)){
+        if(obj instanceof Player){
+            obj.gliding = false;
+            obj.soaring = false;
+            obj.diving = false;
+            obj.goingLeft = false;
+            obj.goingRight = false;
+            angleOfImpact = Math.atan2(
+                obj.position.y + obj.height/2 - this.position.y - this.height/2,
+                obj.position.x + obj.width/2 - this.position.x - this.width/2);
+            powerOfV = Math.sqrt(obj.velocity.x ** 2 + obj.velocity.y ** 2);
+            obj.delayTimer = Math.floor((powerOfV ** 2)/5);
+            obj.velocity.x = Math.sin(-angleOfImpact + Math.PI/2) * powerOfV;
+            obj.velocity.y = Math.cos(-angleOfImpact + Math.PI/2) * powerOfV;
+        }
+    }
+}
+Block.prototype.draw = function(obj){
+    var CTX = GAME.context;
+    CTX.fillStyle = "#000000";
+    CTX.fillRect(this.position.x + 3, this.position.y + 3,
+    this.width - 3, this.height - 3);
+}
+function Player(X, Y, W, H){
+    Entity.call(this, X, Y, W, H);
+    this.facingRight = 1;
+    this.diving = false;
+    this.gliding = false;
+    this.soaring = false;
+    this.goingLeft = false;
+    this.goingRight = false;
+    this.delayTimer = 0;
+}
+Player.prototype = Object.create(Entity.prototype);
+Player.prototype.update = function(){
+    if(this.diving){
+        this.applyForce(0, 1);
+    }
+    if(this.gliding){
+        this.applyForce(0, -0.8);
+        this.applyForce(0.2 * this.velocity.y * this.facingRight,
+        -0.1 * this.velocity.y);
+    }
+    if(this.soaring){
+        //this.applyForce(0, -0.8);
+        this.applyForce(0.1 * -this.velocity.x,
+        -0.225 * this.velocity.x * this.facingRight);
+    }
+    if(this.goingLeft){
+        this.applyForce(-0.3, 0);
+        player.facingRight = -1;
+    }
+    if(this.goingRight){
+        this.applyForce(0.3, 0);
+        player.facingRight = 1;
+    }
+    if(this.delayTimer > 0){
+        this.delayTimer--;
+    }
+    this.move();
+    this.applyGravity();
+    this.draw();
+    //TODO: patch out moving
+    if(this.position.x > GAME.canvas.width){
+        this.position.x = -this.width;
+    }
+    if(this.position.x < -this.width){
+        this.position.x = GAME.canvas.width;
+    }
+    if(this.position.y > GAME.canvas.height - this.height){
+        this.position.y = GAME.canvas.height - this.height;
+        this.velocity.y *= -0.25;
+        this.delayTimer = Math.floor((this.velocity.y ** 2)/2);
+    }
+    if(this.position.y < 0){
+        this.position.y = 0;
+        this.velocity.y *= -0.25;
+        this.delayTimer = Math.floor((this.velocity.y ** 2)/2);
+    }
+}
+Player.prototype.draw = function(){
+    var CTX = GAME.context;
+    var color = [Math.max(255 - (this.delayTimer * 5), 0), 0, 0];
+    if(this.delayTimer == 0){
+        CTX.fillStyle = listToColor(color);
+    }else{
+        CTX.fillStyle = listToColor(color);
+    }
+    CTX.fillRect(this.position.x, this.position.y, this.width, this.height);
+}
+var entities = [
+    new Block(400, 250, 100, 300),
+    new Water(0, 750, 1000, 50, 0, -1.1),
+];
+var player = new Player(50, 50, 50, 50);
+
+document.onkeydown = function(e){
+    e = e || window.event;
+    if(player.delayTimer <= 3){
+        if(e.keyCode == 37){ //Left
+            player.goingLeft = true;
+        }
+        if(e.keyCode == 39){ //Right
+            player.goingRight = true;
+        }
+    }
+    if(player.delayTimer == 0){
+        if(e.keyCode == 38 && !player.gliding){ //Up
+            player.applyForce(0 * player.facingRight, -10 - player.velocity.y/2);
+            if(player.gliding){
+                player.gliding = false;
+            }
+            player.delayTimer = 3;
+        }
+        if(e.keyCode == 40){ //Down
+            player.diving = true;
+        }
+        if(e.keyCode == 90){ //Z
+            player.gliding = true;
+        }
+        if(e.keyCode == 88){ //X
+            player.applyForce(-player.facingRight * 17 - player.velocity.x, 0);
+        }
+        if(e.keyCode == 67){ //C
+            player.soaring = true;
+        }
+    }
+}
+document.onkeyup = function(e){
+    e = e || window.event;
+    if(player.delayTimer <= 10){
+        if(e.keyCode == 37){ //Left
+            player.goingLeft = false;
+        }
+        if(e.keyCode == 39){ //Right
+            player.goingRight = false;
+        }
+    }
+    if(e.keyCode == 40){ //Down
+        player.diving = false;
+    }
+    if(e.keyCode == 90){ //X
+        player.gliding = false;
+    }
+    if(e.keyCode == 67){ //C
+        player.soaring = false;
+        player.delayTimer = 3;
+    }
+}
+function init(){
+    GAME.start();
+}
+function main(){
+    GAME.clear();
+    player.update();
+    for(var i in entities){
+        if(entities[i] instanceof Entity){
+            entities[i].draw();
+            entities[i].interact(player);
+        }
+    }
+}
+//footer
+        </script>
+    </head>
+    <body onload="init()">
+        
+    </body>
+</html>
