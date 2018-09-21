@@ -13,8 +13,8 @@
 var GAME = {
     canvas: document.createElement("canvas"),
     start: function(){
-        this.canvas.width = 1000;
-        this.canvas.height = 800;
+        this.canvas.width = 1200;
+        this.canvas.height = 600;
         this.context = this.canvas.getContext("2d");
         document.body.insertBefore(this.canvas, document.body.childNodes[0]);
         this.frameCount = 0;
@@ -28,9 +28,9 @@ var GAME = {
     level: 1,
     camera: {x:0, y:0},
     editingMode: true,
-    debugMode: false
+    debugMode: false,
+    DATE: new Date(),
 }
-
 function colorToList(color){
     return [
         parseInt(color.slice(1, 3), 16),
@@ -62,7 +62,8 @@ Entity.prototype.applyGravity = function(){
 Entity.prototype.draw = function(){
     var CTX = GAME.context;
     CTX.fillStyle = "#FF0000";
-    CTX.fillRect(this.position.x, this.position.y, this.width, this.height);
+    CTX.fillRect(0, 0, this.width, this.height);
+    CTX.restore();
 }
 Entity.prototype.applyForce = function(x, y){
     this.velocity.x += x;
@@ -76,6 +77,19 @@ Entity.prototype.collides = function(obj){
             this.position.y < obj.position.y + obj.height);
     }
     return false;
+}
+Entity.prototype.centerPosition = function(){
+    var CTX = GAME.context;
+    CTX.save();
+    CTX.translate(this.position.x - GAME.camera.x,
+                this.position.y - GAME.camera.y);
+}
+Entity.prototype.onScreen = function(){
+    return
+    (this.position.x - GAME.camera.x + this.width > 0 &&
+    this.position.x - GAME.camera.x < GAME.canvas.width &&
+    this.position.y - GAME.camera.y + this.height > 0 &&
+    this.position.y - GAME.camera.y < GAME.canvas.height);
 }
 Entity.prototype.interact = function(obj){ /*method stub*/ }
 function WindArea(X, Y, W, H, forceX, forceY){
@@ -93,8 +107,9 @@ WindArea.prototype.draw = function(){
     CTX.globalAlpha = 0.5;
     //TODO: Replace with image
     CTX.fillStyle = "#DEDEDE";
-    CTX.fillRect(this.position.x, this.position.y, this.width, this.height);
+    CTX.fillRect(0, 0, this.width, this.height);
     CTX.globalAlpha = 1;
+    CTX.restore();
 }
 function Water(X, Y, W, H, forceX, forceY){
     Entity.call(this, X, Y, W, H);
@@ -121,8 +136,9 @@ Water.prototype.draw = function(){
     CTX.globalAlpha = 0.5;
     //TODO: Replace with image
     CTX.fillStyle = "#00AAFF";
-    CTX.fillRect(this.position.x, this.position.y, this.width, this.height);
+    CTX.fillRect(0, 0, this.width, this.height);
     CTX.globalAlpha = 1;
+    CTX.restore();
 }
 function Block(X, Y, W, H){
     Entity.call(this, X, Y, W, H);
@@ -140,7 +156,7 @@ Block.prototype.interact = function(obj){
                 obj.position.y + obj.height/2 - this.position.y - this.height/2,
                 obj.position.x + obj.width/2 - this.position.x - this.width/2);
             powerOfV = Math.sqrt(obj.velocity.x ** 2 + obj.velocity.y ** 2);
-            obj.delayTimer = Math.floor((powerOfV ** 2)/5);
+            obj.delayTimer = Math.floor(powerOfV * 2);
             obj.velocity.x = Math.sin(-angleOfImpact + Math.PI/2) * powerOfV;
             obj.velocity.y = Math.cos(-angleOfImpact + Math.PI/2) * powerOfV;
         }
@@ -149,8 +165,17 @@ Block.prototype.interact = function(obj){
 Block.prototype.draw = function(obj){
     var CTX = GAME.context;
     CTX.fillStyle = "#000000";
-    CTX.fillRect(this.position.x + 3, this.position.y + 3,
-    this.width - 3, this.height - 3);
+    CTX.fillRect(1, 1, this.width - 2, this.height - 2);
+    CTX.restore();
+}
+function FinishLine(X, Y, W, H){
+    Entity.call(this, X, Y, W, H);
+}
+FinishLine.prototype = Object.create(Entity.prototype);
+FinishLine.prototype.interact = function(obj){
+    if(obj instanceof Player && this.collides(obj)){
+        alert(GAME.DATE.getTime() - initTime);
+    }
 }
 function Player(X, Y, W, H){
     Entity.call(this, X, Y, W, H);
@@ -188,26 +213,11 @@ Player.prototype.update = function(){
     if(this.delayTimer > 0){
         this.delayTimer--;
     }
+    GAME.camera.x = this.position.x - GAME.canvas.width/2 + this.width/2;
+    GAME.camera.y = this.position.y - GAME.canvas.height/2 + this.height/2;
     this.move();
     this.applyGravity();
     this.draw();
-    //TODO: patch out moving
-    if(this.position.x > GAME.canvas.width){
-        this.position.x = -this.width;
-    }
-    if(this.position.x < -this.width){
-        this.position.x = GAME.canvas.width;
-    }
-    if(this.position.y > GAME.canvas.height - this.height){
-        this.position.y = GAME.canvas.height - this.height;
-        this.velocity.y *= -0.25;
-        this.delayTimer = Math.floor((this.velocity.y ** 2)/2);
-    }
-    if(this.position.y < 0){
-        this.position.y = 0;
-        this.velocity.y *= -0.25;
-        this.delayTimer = Math.floor((this.velocity.y ** 2)/2);
-    }
 }
 Player.prototype.draw = function(){
     var CTX = GAME.context;
@@ -217,16 +227,34 @@ Player.prototype.draw = function(){
     }else{
         CTX.fillStyle = listToColor(color);
     }
-    CTX.fillRect(this.position.x, this.position.y, this.width, this.height);
+    CTX.fillRect(0, 0, this.width, this.height);
+    CTX.restore();
 }
 var entities = [
+    new Block(0, -50, 5000, 30),
+    new Block(100, 500, 100, 1250),
     new Block(400, 250, 100, 300),
-    new Water(0, 750, 1000, 50, 0, -1.1),
+    new Block(800, -50, 100, 300),
+    new Block(800, 550, 100, 300),
+    new Block(900, 50, 50, 50),
+    new Block(1000, 150, 100, 50),
+    new Block(1100, 250, 100, 50),
+    new Block(1200, 350, 100, 50),
+    new Block(1300, 450, 100, 50),
+    new Block(1000, 750, 100, 50),
+    new Block(1100, 800, 100, 50),
+    new Block(1200, 850, 100, 50),
+    new Block(1300, 900, 100, 50),
+    new Water(-2000, 950, 5000, 2000, 0, -1.2),
+    new FinishLine(3000, 0, 100, 2000),
 ];
-var player = new Player(50, 50, 50, 50);
-
+var player = new Player(0, 0, 50, 50);
+var initTime = 0;
 document.onkeydown = function(e){
     e = e || window.event;
+    if(initTime == 0){
+        initTime = GAME.DATE.getTime();
+    }
     if(player.delayTimer <= 3){
         if(e.keyCode == 37){ //Left
             player.goingLeft = true;
@@ -283,10 +311,15 @@ function init(){
 }
 function main(){
     GAME.clear();
+    GAME.DATE = new Date();
+    player.centerPosition();
     player.update();
     for(var i in entities){
         if(entities[i] instanceof Entity){
-            entities[i].draw();
+            if(entities[i].onScreen){
+                entities[i].centerPosition();
+                entities[i].draw();
+            }
             entities[i].interact(player);
         }
     }
