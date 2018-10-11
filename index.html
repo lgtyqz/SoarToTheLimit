@@ -21,7 +21,7 @@ var GAME = {
         this.interval = setInterval(main, 20);
     },
     clear: function(){
-        this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.context.clearRect(0, 0, this.canvas.width * 2, this.canvas.height * 2);
     },
     gravity: 1,
     friction: 0.98,
@@ -105,7 +105,7 @@ WindArea.prototype.interact = function(obj){
 WindArea.prototype.draw = function(){
     var CTX = GAME.context;
     CTX.globalAlpha = 0.5;
-    //TODO: Replace with image
+    //TODO: Replace with image & particle effects
     CTX.fillStyle = "#DEDEDE";
     CTX.fillRect(0, 0, this.width, this.height);
     CTX.globalAlpha = 1;
@@ -119,8 +119,8 @@ Water.prototype = Object.create(Entity.prototype);
 Water.prototype.interact = function(obj){
     if(obj instanceof Entity && this.collides(obj)){
         obj.applyForce(this.force.x, this.force.y);
-        obj.velocity.x *= 0.9;
-        obj.velocity.y *= 0.9;
+        obj.velocity.x *= 0.95;
+        obj.velocity.y *= 0.95;
         if(obj instanceof Player){
             obj.gliding = false;
             obj.soaring = false;
@@ -150,13 +150,11 @@ Block.prototype.interact = function(obj){
             obj.gliding = false;
             obj.soaring = false;
             obj.diving = false;
-            obj.goingLeft = false;
-            obj.goingRight = false;
             angleOfImpact = Math.atan2(
                 obj.position.y + obj.height/2 - this.position.y - this.height/2,
                 obj.position.x + obj.width/2 - this.position.x - this.width/2);
             powerOfV = Math.sqrt(obj.velocity.x ** 2 + obj.velocity.y ** 2);
-            obj.delayTimer = Math.floor(powerOfV * 2);
+            obj.delayTimer = Math.floor(powerOfV/2);
             obj.velocity.x = Math.sin(-angleOfImpact + Math.PI/2) * powerOfV;
             obj.velocity.y = Math.cos(-angleOfImpact + Math.PI/2) * powerOfV;
         }
@@ -174,7 +172,8 @@ function FinishLine(X, Y, W, H){
 FinishLine.prototype = Object.create(Entity.prototype);
 FinishLine.prototype.interact = function(obj){
     if(obj instanceof Player && this.collides(obj)){
-        alert(GAME.DATE.getTime() - initTime);
+        document.getElementById("output").innerHTML += 
+        (GAME.DATE.getTime() - initTime)/1000 + " seconds<br>";
     }
 }
 function Player(X, Y, W, H){
@@ -200,15 +199,17 @@ Player.prototype.update = function(){
     if(this.soaring){
         //this.applyForce(0, -0.8);
         this.applyForce(0.1 * -this.velocity.x,
-        -0.225 * this.velocity.x * this.facingRight);
+        -0.2 * this.velocity.x * this.facingRight);
     }
-    if(this.goingLeft){
-        this.applyForce(-0.3, 0);
-        player.facingRight = -1;
-    }
-    if(this.goingRight){
-        this.applyForce(0.3, 0);
-        player.facingRight = 1;
+    if(this.delayTimer == 0){
+        if(this.goingLeft){
+            this.applyForce(-0.3, 0);
+            player.facingRight = -1;
+        }
+        if(this.goingRight){
+            this.applyForce(0.3, 0);
+            player.facingRight = 1;
+        }
     }
     if(this.delayTimer > 0){
         this.delayTimer--;
@@ -231,22 +232,13 @@ Player.prototype.draw = function(){
     CTX.restore();
 }
 var entities = [
-    new Block(0, -50, 5000, 30),
-    new Block(100, 500, 100, 1250),
-    new Block(400, 250, 100, 300),
-    new Block(800, -50, 100, 300),
-    new Block(800, 550, 100, 300),
-    new Block(900, 50, 50, 50),
-    new Block(1000, 150, 100, 50),
-    new Block(1100, 250, 100, 50),
-    new Block(1200, 350, 100, 50),
-    new Block(1300, 450, 100, 50),
-    new Block(1000, 750, 100, 50),
-    new Block(1100, 800, 100, 50),
-    new Block(1200, 850, 100, 50),
-    new Block(1300, 900, 100, 50),
-    new Water(-2000, 950, 5000, 2000, 0, -1.2),
-    new FinishLine(3000, 0, 100, 2000),
+    new WindArea(0, -250, 5000, 250, 0, 3),
+    new Block(200, 0, 75, 1000),
+    new Block(800, 800, 300, 800),
+    new Block(1700, 0, 300, 800),
+    new Block(2600, 800, 300, 800),
+    new Water(-2000, 1500, 7000, 2000, 0, -1.4),
+    new FinishLine(5000, 0, 100, 2000),
 ];
 var player = new Player(0, 0, 50, 50);
 var initTime = 0;
@@ -277,10 +269,10 @@ document.onkeydown = function(e){
         if(e.keyCode == 90){ //Z
             player.gliding = true;
         }
-        if(e.keyCode == 88){ //X
-            player.applyForce(-player.facingRight * 17 - player.velocity.x, 0);
-        }
         if(e.keyCode == 67){ //C
+            player.applyForce(-player.facingRight * 25 - player.velocity.x, 0);
+        }
+        if(e.keyCode == 88){ //X
             player.soaring = true;
         }
     }
@@ -298,20 +290,23 @@ document.onkeyup = function(e){
     if(e.keyCode == 40){ //Down
         player.diving = false;
     }
-    if(e.keyCode == 90){ //X
+    if(e.keyCode == 90){ //Z
         player.gliding = false;
     }
-    if(e.keyCode == 67){ //C
+    if(e.keyCode == 88){ //X
         player.soaring = false;
-        player.delayTimer = 3;
     }
 }
 function init(){
     GAME.start();
+    GAME.context.transform(0.6, 0, 0, 0.6, 100, 100);
 }
 function main(){
     GAME.clear();
     GAME.DATE = new Date();
+    GAME.context.fillStyle = "#FFFFFF";
+    GAME.context.fillRect(-GAME.canvas.width * 3, -GAME.canvas.height * 3,
+    GAME.canvas.width * 6, GAME.canvas.height * 6);
     player.centerPosition();
     player.update();
     for(var i in entities){
@@ -328,6 +323,6 @@ function main(){
         </script>
     </head>
     <body onload="init()">
-        
+        <div id="output"></div>
     </body>
 </html>
