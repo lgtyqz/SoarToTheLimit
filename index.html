@@ -242,6 +242,8 @@ function restart(){
     player.finished = false;
     this.facingRight = 1;
     this.delayTimer = 0;
+    this.goingLeft = false;
+    this.goingRight = false;
 }
 function drawForeground(){
     var CTX = GAME.context;
