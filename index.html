@@ -17,8 +17,11 @@ var GAME = {
         this.canvas.height = 600;
         this.context = this.canvas.getContext("2d");
         document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+    },
+    activate: function(){
         this.frameCount = 0;
         this.interval = setInterval(main, 20);
+        restart();
     },
     clear: function(){
         this.context.clearRect(0, 0, this.canvas.width * 2, this.canvas.height * 2);
@@ -172,8 +175,7 @@ function FinishLine(X, Y, W, H){
 FinishLine.prototype = Object.create(Entity.prototype);
 FinishLine.prototype.interact = function(obj){
     if(obj instanceof Player && this.collides(obj)){
-        document.getElementById("output").innerHTML += 
-        (GAME.DATE.getTime() - initTime)/1000 + " seconds<br>";
+        obj.finished = true;
     }
 }
 function Player(X, Y, W, H){
@@ -185,6 +187,7 @@ function Player(X, Y, W, H){
     this.goingLeft = false;
     this.goingRight = false;
     this.delayTimer = 0;
+    this.finished = false;
 }
 Player.prototype = Object.create(Entity.prototype);
 Player.prototype.update = function(){
@@ -231,6 +234,30 @@ Player.prototype.draw = function(){
     CTX.fillRect(0, 0, this.width, this.height);
     CTX.restore();
 }
+function restart(){
+    initTime = GAME.DATE.getTime();
+    player.position = {x: 50, y: 50};
+    player.velocity = {x: 0, y: 0};
+    player.finished = false;
+    this.facingRight = 1;
+    this.diving = false;
+    this.gliding = false;
+    this.soaring = false;
+    this.goingLeft = false;
+    this.goingRight = false;
+    this.delayTimer = 0;
+}
+function drawForeground(){
+    var CTX = GAME.context;
+    if(player.finished){
+        CTX.fillStyle = "#FF0000";
+    }else{
+        CTX.fillStyle = "#000000";
+    }
+    CTX.font = "50px Tahoma";
+    CTX.textAlign = "center";
+    CTX.fillText((GAME.DATE.getTime() - initTime)/1000 + " seconds", 1200, 800);
+}
 var entities = [
     new WindArea(0, -250, 5000, 250, 0, 3),
     new Block(200, 0, 75, 1000),
@@ -245,7 +272,7 @@ var initTime = 0;
 document.onkeydown = function(e){
     e = e || window.event;
     if(initTime == 0){
-        initTime = GAME.DATE.getTime();
+        GAME.activate();
     }
     if(player.delayTimer <= 3){
         if(e.keyCode == 37){ //Left
@@ -276,6 +303,9 @@ document.onkeydown = function(e){
             player.soaring = true;
         }
     }
+    if(e.keyCode == 32){ //Spacebar
+        restart();
+    }
 }
 document.onkeyup = function(e){
     e = e || window.event;
@@ -300,10 +330,13 @@ document.onkeyup = function(e){
 function init(){
     GAME.start();
     GAME.context.transform(0.6, 0, 0, 0.6, 100, 100);
+    alert("Press a key to start.");
 }
 function main(){
     GAME.clear();
-    GAME.DATE = new Date();
+    if(!player.finished){
+        GAME.DATE = new Date();
+    }
     GAME.context.fillStyle = "#FFFFFF";
     GAME.context.fillRect(-GAME.canvas.width * 3, -GAME.canvas.height * 3,
     GAME.canvas.width * 6, GAME.canvas.height * 6);
@@ -318,6 +351,7 @@ function main(){
             entities[i].interact(player);
         }
     }
+    drawForeground();
 }
 //footer
         </script>
