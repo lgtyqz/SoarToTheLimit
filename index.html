@@ -21,6 +21,7 @@ var GAME = {
     activate: function(){
         this.frameCount = 0;
         this.interval = setInterval(main, 20);
+        GAME.DATE = new Date();
         restart();
     },
     clear: function(){
@@ -240,11 +241,6 @@ function restart(){
     player.velocity = {x: 0, y: 0};
     player.finished = false;
     this.facingRight = 1;
-    this.diving = false;
-    this.gliding = false;
-    this.soaring = false;
-    this.goingLeft = false;
-    this.goingRight = false;
     this.delayTimer = 0;
 }
 function drawForeground(){
